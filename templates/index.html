@@ -308,7 +308,7 @@
 <body>
     <div class="container">
         <h1>🐦 Tweet Sentiment Analyzer</h1>
-        <p class="subtitle">Discover the emotional tone of any tweet using AI</p>
+        <p class="subtitle">Discover the emotional tone of any tweet using ML</p>
 
         <div class="example-tweets">
             <div class="example-tweet" onclick="setExampleTweet('I love this new feature! Amazing work!')">😍 Positive</div>
@@ -359,7 +359,7 @@
                 <button class="copy-btn" onclick="copyToClipboard('POST /api/predict')">Copy</button>
             </div>
             <div class="api-endpoint">
-                curl -X POST "http://localhost:8000/api/predict" \
+                curl -X POST "https://twiter-sentiment-analysis.onrender.com/api/predict" \
                 -H "Content-Type: application/json" \
                 -d '{"tweet": "Your tweet here"}'
                 <button class="copy-btn" onclick="copyToClipboard(this.previousSibling.textContent)">Copy</button>
