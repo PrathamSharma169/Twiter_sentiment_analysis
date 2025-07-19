@@ -120,9 +120,7 @@ flask_app = Flask(__name__)
 def index():
     """Serves the main HTML page."""
     try:
-        with open("index.html", "r", encoding="utf-8") as f:
-            html_content = f.read()
-        return render_template_string(html_content)
+        return render_template("index.html")
     except FileNotFoundError:
         return "Error: index.html not found.", 404
 
