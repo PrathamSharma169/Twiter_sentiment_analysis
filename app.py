@@ -14,6 +14,7 @@ from fastapi.middleware.wsgi import WSGIMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+import threading
 
 # ============= INITIAL SETUP AND MODEL LOADING =============
 
@@ -188,22 +189,79 @@ def flask_predict():
 fastapi_app.mount("/", WSGIMiddleware(flask_app))
 
 # Run the server using uvicorn when the script is executed
-if __name__ == "__main__":
-    # Create templates directory if it doesn't exist
-    if not os.path.exists('templates'):
-        os.makedirs('templates')
-        print("📁 Created 'templates' directory")
+def run_flask():
+    """Run Flask app in a separate thread"""
+    flask_app.run(host="0.0.0.0", port=5000, debug=False)
+
+def run_fastapi():
+    """Run FastAPI app"""
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
+
+def run_flask_production():
+    """Run Flask app for production"""
+    port = int(os.environ.get("PORT", 10000))
+    flask_app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+
+def run_fastapi_production():
+    """Run FastAPI app for production"""
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=port, workers=1)
+
+if __name__ == '__main__':
+    import sys
+    import os
     
-    # Create static directory if it doesn't exist
-    if not os.path.exists('static'):
-        os.makedirs('static')
-        print("📁 Created 'static' directory")
+    # Get port from environment variable (Render sets this to 10000)
+    port = int(os.environ.get("PORT", 10000))
     
-    # Check if index.html exists
-    if not os.path.exists('templates/index.html'):
-        print("⚠️ Warning: templates/index.html not found!")
-        print("Please create a 'templates' folder and put your index.html file inside it.")
+    # Check if running in production (Render sets RENDER environment variable)
+    is_production = os.environ.get("RENDER") is not None
     
-    print("🚀 Starting server... Navigate to http://127.0.0.1:8000")
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
+    if is_production:
+        print(f"🚀 Starting FastAPI server in production mode on port {port}")
+        print(f"📖 API Documentation available at your-app-url.onrender.com/docs")
+        # In production, run FastAPI only (more stable for deployment)
+        uvicorn.run(
+            fastapi_app, 
+            host="0.0.0.0", 
+            port=port,
+            workers=1,
+            access_log=True,
+            log_level="info"
+        )
+    elif len(sys.argv) > 1:
+        if sys.argv[1] == "flask":
+            print(f"🚀 Starting Flask server on port {port}")
+            flask_app.run(host="0.0.0.0", port=port, debug=True)
+        elif sys.argv[1] == "fastapi":
+            print(f"🚀 Starting FastAPI server on port {port}")
+            print(f"📖 API Documentation available at http://localhost:{port}/docs")
+            uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
+        elif sys.argv[1] == "both":
+            print("🚀 Starting both Flask (port 5000) and FastAPI (port 8000) servers...")
+            print("🌐 Flask UI: http://localhost:5000")
+            print("🔧 FastAPI: http://localhost:8000")
+            print("📖 API Docs: http://localhost:8000/docs")
+            
+            # Start Flask in a separate thread
+            flask_thread = threading.Thread(target=run_flask)
+            flask_thread.daemon = True
+            flask_thread.start()
+            
+            # Start FastAPI in main thread
+            uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
+        else:
+            print("Usage: python app.py [flask|fastapi|both]")
+    else:
+        print(f"🚀 Starting FastAPI server on port {port} (default)")
+        print(f"📖 API Documentation available at http://localhost:{port}/docs")
+        print("💡 Use 'python app.py flask' to run Flask only")
+        print("💡 Use 'python app.py both' to run both servers")
+        uvicorn.run(
+            fastapi_app, 
+            host="0.0.0.0", 
+            port=port,
+            reload=not is_production,
+            access_log=True,
+            log_level="info"
+        )
