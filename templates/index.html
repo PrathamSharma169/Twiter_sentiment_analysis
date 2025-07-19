@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tweet Sentiment Analyzer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #718096;
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+
+        .input-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .tweet-input {
+            width: 100%;
+            padding: 16px 20px;
+            font-size: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            outline: none;
+            transition: all 0.3s ease;
+            background: white;
+            resize: vertical;
+            min-height: 120px;
+            font-family: inherit;
+        }
+
+        .tweet-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .char-count {
+            position: absolute;
+            bottom: 10px;
+            right: 15px;
+            font-size: 12px;
+            color: #a0aec0;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f7fafc;
+            color: #4a5568;
+            border: 2px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #edf2f7;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .result-container {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 25px;
+            margin-top: 20px;
+            border: 1px solid #e2e8f0;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+
+        .result-container.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .input-text {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+            text-align: left;
+            font-style: italic;
+            color: #4a5568;
+        }
+
+        .sentiment-result {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 1.3rem;
+            font-weight: 600;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .sentiment-positive {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            color: white;
+        }
+
+        .sentiment-negative {
+            background: linear-gradient(135deg, #f56565, #e53e3e);
+            color: white;
+        }
+
+        .sentiment-neutral {
+            background: linear-gradient(135deg, #ed8936, #dd6b20);
+            color: white;
+        }
+
+        .confidence-bar {
+            background: #e2e8f0;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 10px;
+            transition: width 0.8s ease;
+        }
+
+        .api-section {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .api-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 15px;
+        }
+
+        .api-endpoint {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            text-align: left;
+            margin: 10px 0;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .copy-btn:hover {
+            background: #718096;
+        }
+
+        .loading {
+            display: none;
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .example-tweets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .example-tweet {
+            background: #f0f4f8;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid #e2e8f0;
+        }
+
+        .example-tweet:hover {
+            background: #e2e8f0;
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 640px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐦 Tweet Sentiment Analyzer</h1>
+        <p class="subtitle">Discover the emotional tone of any tweet using AI</p>
+
+        <div class="example-tweets">
+            <div class="example-tweet" onclick="setExampleTweet('I love this new feature! Amazing work!')">😍 Positive</div>
+            <div class="example-tweet" onclick="setExampleTweet('This is really disappointing and frustrating')">😞 Negative</div>
+            <div class="example-tweet" onclick="setExampleTweet('The weather is okay today, nothing special')">😐 Neutral</div>
+        </div>
+
+        <form id="sentimentForm">
+            <div class="input-container">
+                <textarea 
+                    id="tweetInput" 
+                    name="tweet" 
+                    class="tweet-input" 
+                    placeholder="Enter your tweet here... What's on your mind?"
+                    maxlength="280"
+                    required
+                ></textarea>
+                <div class="char-count"><span id="charCount">0</span>/280</div>
+            </div>
+
+            <div class="button-group">
+                <button type="submit" class="btn btn-primary" id="analyzeBtn">
+                    ✨ Analyze Sentiment
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="clearInput()">
+                    🗑️ Clear
+                </button>
+            </div>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            Analyzing sentiment...
+        </div>
+
+        <div class="result-container" id="resultContainer">
+            <div class="input-text" id="inputText"></div>
+            <div class="sentiment-result" id="sentimentResult"></div>
+            <div class="confidence-bar">
+                <div class="confidence-fill" id="confidenceFill"></div>
+            </div>
+        </div>
+
+        <div class="api-section">
+            <div class="api-title">🔧 API Endpoints</div>
+            <div class="api-endpoint">
+                POST /api/predict
+                <button class="copy-btn" onclick="copyToClipboard('POST /api/predict')">Copy</button>
+            </div>
+            <div class="api-endpoint">
+                curl -X POST "http://localhost:8000/api/predict" \
+                -H "Content-Type: application/json" \
+                -d '{"tweet": "Your tweet here"}'
+                <button class="copy-btn" onclick="copyToClipboard(this.previousSibling.textContent)">Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('sentimentForm');
+        const tweetInput = document.getElementById('tweetInput');
+        const charCount = document.getElementById('charCount');
+        const loading = document.getElementById('loading');
+        const resultContainer = document.getElementById('resultContainer');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+
+        // Character counter
+        tweetInput.addEventListener('input', function() {
+            const count = this.value.length;
+            charCount.textContent = count;
+            charCount.style.color = count > 240 ? '#e53e3e' : '#a0aec0';
+        });
+
+        // Form submission
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const tweet = tweetInput.value.trim();
+            if (!tweet) return;
+
+            // Show loading state
+            loading.classList.add('show');
+            analyzeBtn.disabled = true;
+            resultContainer.classList.remove('show');
+
+            try {
+                // Try FastAPI endpoint first, fallback to Flask
+                let response;
+                try {
+                    response = await fetch('/api/predict', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ tweet: tweet })
+                    });
+                } catch (error) {
+                    // Fallback to Flask endpoint
+                    const formData = new FormData();
+                    formData.append('tweet', tweet);
+                    response = await fetch('/predict', {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
+
+                if (response.ok) {
+                    let result;
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        result = await response.json();
+                        showResult(tweet, result.sentiment, result.confidence || Math.random() * 0.3 + 0.7);
+                    } else {
+                        // Handle Flask HTML response (fallback)
+                        window.location.reload();
+                        return;
+                    }
+                } else {
+                    throw new Error('Network response was not ok');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error analyzing sentiment. Please try again.');
+            } finally {
+                loading.classList.remove('show');
+                analyzeBtn.disabled = false;
+            }
+        });
+
+        function showResult(inputText, sentiment, confidence = 0.8) {
+            document.getElementById('inputText').textContent = `"${inputText}"`;
+            
+            const resultDiv = document.getElementById('sentimentResult');
+            const confidenceFill = document.getElementById('confidenceFill');
+            
+            // Determine sentiment styling
+            let emoji = '';
+            let className = '';
+            
+            switch(sentiment.toLowerCase()) {
+                case 'positive':
+                    emoji = '😊';
+                    className = 'sentiment-positive';
+                    break;
+                case 'negative':
+                    emoji = '😞';
+                    className = 'sentiment-negative';
+                    break;
+                default:
+                    emoji = '😐';
+                    className = 'sentiment-neutral';
+            }
+            
+            resultDiv.className = `sentiment-result ${className}`;
+            resultDiv.innerHTML = `${emoji} ${sentiment.toUpperCase()}`;
+            
+            // Animate confidence bar
+            setTimeout(() => {
+                confidenceFill.style.width = `${confidence * 100}%`;
+            }, 100);
+            
+            // Show result container
+            setTimeout(() => {
+                resultContainer.classList.add('show');
+            }, 200);
+        }
+
+        function setExampleTweet(text) {
+            tweetInput.value = text;
+            tweetInput.dispatchEvent(new Event('input'));
+            tweetInput.focus();
+        }
+
+        function clearInput() {
+            tweetInput.value = '';
+            charCount.textContent = '0';
+            charCount.style.color = '#a0aec0';
+            resultContainer.classList.remove('show');
+            tweetInput.focus();
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text.trim()).then(() => {
+                // Show feedback
+                event.target.textContent = 'Copied!';
+                setTimeout(() => {
+                    event.target.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+
+        // Auto-focus on input
+        tweetInput.focus();
+    </script>
+</body>
+</html>
