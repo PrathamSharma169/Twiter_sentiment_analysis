@@ -8,13 +8,10 @@ from pydantic import BaseModel
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 
-from flask import Flask, request, render_template, jsonify, send_from_directory
+from flask import Flask, request, render_template, jsonify
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.wsgi import WSGIMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-import os
-import threading
 
 # ============= INITIAL SETUP AND MODEL LOADING =============
 
@@ -32,11 +29,7 @@ try:
 except FileNotFoundError as e:
     print(f"🔴 Error loading model files: {e}")
     print("Ensure 'logistic_model.pkl', 'vectorizer.pkl', and 'label_encoder.pkl' are in the same directory.")
-    # For testing purposes, create dummy objects
-    print("⚠️ Running in demo mode without actual model files")
-    model = None
-    vectorizer = None
-    label_encoder = None
+    exit(1)
 
 # ============= SHARED LOGIC (CLEANING & PREDICTION) =============
 
@@ -62,33 +55,6 @@ def predict_sentiment(tweet_text: str) -> dict:
         
     try:
         cleaned_tweet = clean_text(tweet_text)
-        
-        # If model files are not available, return demo results
-        if model is None or vectorizer is None or label_encoder is None:
-            # Simple demo logic based on keywords
-            positive_words = ['love', 'great', 'amazing', 'good', 'excellent', 'wonderful', 'fantastic']
-            negative_words = ['hate', 'bad', 'terrible', 'awful', 'horrible', 'disappointing', 'frustrating']
-            
-            text_lower = tweet_text.lower()
-            pos_count = sum(1 for word in positive_words if word in text_lower)
-            neg_count = sum(1 for word in negative_words if word in text_lower)
-            
-            if pos_count > neg_count:
-                sentiment = "positive"
-                confidence = 0.75 + (pos_count * 0.05)
-            elif neg_count > pos_count:
-                sentiment = "negative" 
-                confidence = 0.75 + (neg_count * 0.05)
-            else:
-                sentiment = "neutral"
-                confidence = 0.65
-                
-            return {
-                "sentiment": sentiment,
-                "confidence": min(confidence, 0.95),
-                "cleaned_text": cleaned_tweet
-            }
-        
         vectorized_tweet = vectorizer.transform([cleaned_tweet])
         
         # Predict sentiment and probabilities
@@ -154,17 +120,13 @@ flask_app = Flask(__name__)
 def index():
     """Serves the main HTML page."""
     try:
-        return render_template("index.html")
-    except Exception as e:
-        return f"Error: Could not find index.html in templates folder. Make sure you have a 'templates' folder with index.html inside it. Error: {str(e)}", 404
+        with open("index.html", "r", encoding="utf-8") as f:
+            html_content = f.read()
+        return render_template_string(html_content)
+    except FileNotFoundError:
+        return "Error: index.html not found.", 404
 
-# 3. Serve static files (if needed for CSS, JS, images)
-@flask_app.route('/static/<path:filename>')
-def static_files(filename):
-    """Serve static files like CSS, JS, images"""
-    return send_from_directory('static', filename)
-
-# 4. Define a fallback predict route for Flask
+# 3. (Optional) Define a fallback predict route for Flask
 @flask_app.route("/predict", methods=['POST'])
 def flask_predict():
     """
@@ -181,6 +143,7 @@ def flask_predict():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 # ============= COMBINE & RUN =============
 
 # Mount the Flask app as a WSGI sub-application on the FastAPI server
@@ -189,79 +152,6 @@ def flask_predict():
 fastapi_app.mount("/", WSGIMiddleware(flask_app))
 
 # Run the server using uvicorn when the script is executed
-def run_flask():
-    """Run Flask app in a separate thread"""
-    flask_app.run(host="0.0.0.0", port=5000, debug=False)
-
-def run_fastapi():
-    """Run FastAPI app"""
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
-
-def run_flask_production():
-    """Run Flask app for production"""
-    port = int(os.environ.get("PORT", 10000))
-    flask_app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
-
-def run_fastapi_production():
-    """Run FastAPI app for production"""
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=port, workers=1)
-
-if __name__ == '__main__':
-    import sys
-    import os
-    
-    # Get port from environment variable (Render sets this to 10000)
-    port = int(os.environ.get("PORT", 10000))
-    
-    # Check if running in production (Render sets RENDER environment variable)
-    is_production = os.environ.get("RENDER") is not None
-    
-    if is_production:
-        print(f"🚀 Starting FastAPI server in production mode on port {port}")
-        print(f"📖 API Documentation available at your-app-url.onrender.com/docs")
-        # In production, run FastAPI only (more stable for deployment)
-        uvicorn.run(
-            fastapi_app, 
-            host="0.0.0.0", 
-            port=port,
-            workers=1,
-            access_log=True,
-            log_level="info"
-        )
-    elif len(sys.argv) > 1:
-        if sys.argv[1] == "flask":
-            print(f"🚀 Starting Flask server on port {port}")
-            flask_app.run(host="0.0.0.0", port=port, debug=True)
-        elif sys.argv[1] == "fastapi":
-            print(f"🚀 Starting FastAPI server on port {port}")
-            print(f"📖 API Documentation available at http://localhost:{port}/docs")
-            uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
-        elif sys.argv[1] == "both":
-            print("🚀 Starting both Flask (port 5000) and FastAPI (port 8000) servers...")
-            print("🌐 Flask UI: http://localhost:5000")
-            print("🔧 FastAPI: http://localhost:8000")
-            print("📖 API Docs: http://localhost:8000/docs")
-            
-            # Start Flask in a separate thread
-            flask_thread = threading.Thread(target=run_flask)
-            flask_thread.daemon = True
-            flask_thread.start()
-            
-            # Start FastAPI in main thread
-            uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
-        else:
-            print("Usage: python app.py [flask|fastapi|both]")
-    else:
-        print(f"🚀 Starting FastAPI server on port {port} (default)")
-        print(f"📖 API Documentation available at http://localhost:{port}/docs")
-        print("💡 Use 'python app.py flask' to run Flask only")
-        print("💡 Use 'python app.py both' to run both servers")
-        uvicorn.run(
-            fastapi_app, 
-            host="0.0.0.0", 
-            port=port,
-            reload=not is_production,
-            access_log=True,
-            log_level="info"
-        )
+if __name__ == "__main__":
+    print("🚀 Starting server... Navigate to http://127.0.0.1:8000")
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=10000)
