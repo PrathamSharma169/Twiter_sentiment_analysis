@@ -9,4 +9,3 @@ uvicorn[standard]
 pydantic
 python-multipart
 gunicorn
-python-multipart
